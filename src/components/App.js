@@ -15,13 +15,23 @@ import {
   Button,
   Badge,
 } from 'react-bootstrap';
+import {
+  Droplet,
+  DropletFill,
+  DropletHalf
+} from 'react-bootstrap-icons'
 import {CopyToClipboard} from 'react-copy-to-clipboard';
 import GitHubButton from 'react-github-btn'
 import Logo from '../assets/logo.png'
 import Logo2x from '../assets/logo@2x.png'
 import Logo3x from '../assets/logo@3x.png'
+import LogoWhite from '../assets/logo-white.png'
+import LogoWhite2x from '../assets/logo-white@2x.png'
+import LogoWhite3x from '../assets/logo-white@3x.png'
 
 import PoweredByAkash from '../assets/logo@3x.png'
+import PoweredByAkashWhite from '../assets/logo@3x.png'
+import TooltipIcon from './TooltipIcon';
 
 class App extends React.Component {
   constructor(props) {
@@ -74,20 +84,26 @@ class App extends React.Component {
         error: 'Could not connect to any available API servers'
       })
     }
-    const chainId = this.props.network.chainId
+    const { network } = this.props
+    const chainId = network.chainId
     try {
       if (window.keplr) {
+        if(network.gasPricePrefer){
+          window.keplr.defaultOptions = {
+            sign: { preferNoSetFee: true }
+          }
+        }
         await window.keplr.enable(chainId);
       }
     } catch (e) {
       console.log(e.message, e)
-      await this.suggestChain(this.props.network)
+      await this.suggestChain(network)
     }
     if (window.getOfflineSigner) {
       try {
         const offlineSigner = await window.getOfflineSignerAuto(chainId)
         const key = await window.keplr.getKey(chainId);
-        const stargateClient = await this.props.network.signingClient(offlineSigner, key)
+        const stargateClient = await network.signingClient(offlineSigner, key, network.gasPricePrefer)
 
         const address = await stargateClient.getAddress()
 
@@ -96,14 +112,14 @@ class App extends React.Component {
         this.setState({
           address: address,
           stargateClient: stargateClient,
-          queryClient: this.props.network.queryClient,
+          queryClient: network.queryClient,
           error: false
         })
         this.getBalance()
       } catch (e) {
         console.log(e)
         return this.setState({
-          error: 'Failed to connect to signing client. API may be down.',
+          error: 'Failed to connect to signing client: ' + e.message,
           loading: false
         })
       }
@@ -165,14 +181,41 @@ class App extends React.Component {
     }, 2000)
   }
 
+  themeIcon() {
+    const { theme, themeChoice, themeDefault, setThemeChoice } = this.props
+    let icon, switchTo
+    let iconProps = {
+      size: '1.4em',
+      className: 'me-3',
+      role: 'button',
+      onClick: () => setThemeChoice(switchTo)
+    }
+    if(themeChoice === 'auto'){
+      icon = <DropletHalf {...iconProps} />
+      switchTo = theme === 'dark' ? 'light' : 'dark'
+    }else{
+      icon = themeChoice === 'dark' ? <DropletFill {...iconProps} /> : <Droplet {...iconProps} />
+      switchTo = themeDefault !== theme ? 'auto' : theme === 'dark' ? 'light' : 'dark'
+    }
+    const tooltip = `Switch to ${switchTo} mode`
+    return (
+      <TooltipIcon icon={icon} tooltip={tooltip} placement="left" />
+    )
+  }
+
   render() {
     return (
       <Container>
         <header className="d-flex flex-wrap justify-content-between py-3 mb-4 border-bottom">
-          <div className="logo d-flex align-items-center mb-3 mb-md-0 text-dark text-decoration-none">
-            <a href="https://highstakes.ch">
-	    <img src={Logo} srcSet={`${Logo2x} 2x, ${Logo3x} 3x`} alt="High Stakes" />
-            </a>
+          <div className="logo d-flex align-items-center mb-3 mb-md-0 text-reset text-decoration-none">
+            <span onClick={() => this.setState({ showAbout: true })} role="button" className="text-reset text-decoration-none">
+              {this.props.theme === 'light'
+               ? (
+                  <img src={Logo} srcSet={`${Logo2x} 2x, ${Logo3x} 3x`} alt="High Stakes" />
+               ) : (
+                  <img src={LogoWhite} srcSet={`${LogoWhite2x} 2x, ${LogoWhite3x} 3x`} alt="High Stakes" />
+               )}
+            </span>
           </div>
           {this.state.address &&
             <ul className="nav nav-pills justify-content-end">
@@ -205,7 +248,8 @@ class App extends React.Component {
               )}
             </ul>
           }
-          <div className="d-flex align-items-center mb-3 mb-md-0 text-dark text-decoration-none">
+          <div className="d-flex align-items-center mb-3 mb-md-0 text-reset text-decoration-none">
+            {this.themeIcon()}
             <NetworkSelect show={this.state.showNetworkSelect} onHide={() => { this.setState({ showNetworkSelect: false }) }} networks={this.props.networks}
               network={this.props.network}
               validators={this.props.validators}
@@ -247,8 +291,8 @@ class App extends React.Component {
           }
           <hr />
           <p className="mt-5 text-center">
-            Enabling REStake will authorize us to send <em>WithdrawDelegatorReward</em> and <em>Delegate</em> transactions on your behalf for 1 year using <a href="https://docs.cosmos.network/master/modules/authz/" target="_blank" rel="noreferrer">Authz</a>.<br />
-            We will only be authorized to delegate to our own validator. You can revoke the authorization at any time and everything is open source.
+            Enabling REStake will authorize us to send <em>WithdrawDelegatorReward</em> and <em>Delegate</em> transactions on your behalf for 1 year <a href="https://docs.cosmos.network/master/modules/authz/" target="_blank" rel="noreferrer" className="text-reset">using Authz</a>.<br />
+            They will only be authorized to delegate to our own validator. You can revoke the authorization at any time and everything is open source.
           </p>
           <p className="text-center mb-4">
             <strong>We will pay the transaction fees for you.</strong>

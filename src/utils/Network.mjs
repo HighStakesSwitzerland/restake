@@ -2,7 +2,6 @@ import _ from 'lodash'
 import { multiply, pow, format, bignumber } from 'mathjs'
 import QueryClient from './QueryClient.mjs'
 import SigningClient from './SigningClient.mjs'
-import ApyClient from '../ApyClient.mjs'
 import Operator from './Operator.mjs'
 import Chain from './Chain.mjs'
 import CosmosDirectory from './CosmosDirectory.mjs'
@@ -16,12 +15,14 @@ class Network {
 
     this.data = data
     this.enabled = data.enabled
+    this.experimental = data.experimental
     this.apyEnabled = data.apyEnabled
-    this.name = data.name
+    this.name = data.path || data.name
+    this.default = data.default
     this.directory = CosmosDirectory()
 
-    this.rpcUrl = data.rpcUrl || this.directory.rpcUrl(data.name)
-    this.restUrl = data.restUrl || this.directory.restUrl(data.name)
+    this.rpcUrl = data.rpcUrl || this.directory.rpcUrl(this.name)
+    this.restUrl = data.restUrl || this.directory.restUrl(this.name)
 
     this.usingDirectory = !![this.restUrl, this.rpcUrl].find(el => {
       const match = el => el.match("cosmos.directory")
@@ -33,9 +34,14 @@ class Network {
     })
   }
 
+  connectedDirectory() {
+    const apis = this.chain ? this.chain.chainData['best_apis'] : this.data['best_apis']
+    return apis && ['rpc', 'rest'].every(type => apis[type].length > 0)
+  }
+
   async load() {
     this.chain = await Chain(this.data)
-    this.validators = await this.directory.getValidators(this.data.name)
+    this.validators = await this.directory.getValidators(this.name)
     this.operators = this.data.operators || this.validators.filter(el => el.restake).map(el => {
       return Operator(el)
     })
@@ -48,32 +54,50 @@ class Network {
     this.decimals = this.chain.decimals
     this.image = this.chain.image
     this.coinGeckoId = this.chain.coinGeckoId
+    this.estimatedApr = this.chain.estimatedApr
     this.authzSupport = this.chain.authzSupport
-    const defaultGasPrice = format(bignumber(multiply(0.000000025, pow(10, this.chain.decimals))), { notation: 'fixed' }) + this.chain.denom
+    const defaultGasPrice = format(bignumber(multiply(0.000000025, pow(10, this.decimals))), { notation: 'fixed' }) + this.denom
     this.gasPrice = this.data.gasPrice || defaultGasPrice
     this.gasPriceStep = this.data.gasPriceStep
+    this.gasPricePrefer = this.data.gasPricePrefer
   }
 
   async connect() {
     try {
       this.queryClient = await QueryClient(this.chain.chainId, this.rpcUrl, this.restUrl)
-      this.apyClient = ApyClient(this.chain, this.queryClient.rpcUrl, this.queryClient.restUrl)
       this.restUrl = this.queryClient.restUrl
       this.rpcUrl = this.queryClient.rpcUrl
-      this.getApy = this.apyClient.getApy
-      this.connected = this.queryClient.connected
+      this.connected = this.queryClient.connected && (!this.usingDirectory || this.connectedDirectory())
     } catch (error) {
       console.log(error)
       this.connected = false
     }
   }
 
-  signingClient(wallet, key) {
+  async getApy(validators, operators){
+    const chainApr = this.chain.estimatedApr
+    let validatorApy = {};
+    for (const [address, validator] of Object.entries(validators)) {
+      if(validator.jailed || validator.status !== 'BOND_STATUS_BONDED'){
+        validatorApy[address] = 0
+      }else{
+        const commission = validator.commission.commission_rates.rate
+        const operator = operators.find((el) => el.address === address)
+        const periodPerYear = operator && this.chain.authzSupport ? operator.runsPerDay() * 365 : 1;
+        const realApr = chainApr * (1 - commission);
+        const apy = (1 + realApr / periodPerYear) ** periodPerYear - 1;
+        validatorApy[address] = apy;
+      }
+    }
+    return validatorApy;
+  }
+
+  signingClient(wallet, key, gasPrice) {
     if (!this.queryClient)
       return
 
-    const client = this.SIGNERS[this.data.name] || SigningClient
-    return client(this.queryClient.rpcUrl, this.gasPrice, wallet, key)
+    const client = this.SIGNERS[this.name] || SigningClient
+    return client(this.queryClient.rpcUrl, gasPrice || this.gasPrice, wallet, key)
   }
 
   getOperator(operatorAddress) {

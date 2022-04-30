@@ -53,6 +53,10 @@ class Delegations extends React.Component {
       clearInterval(this.state.grantInterval);
     }
 
+    if (prevProps.validator !== this.props.validator && this.props.validator && !this.state.validatorModal.show) {
+      this.showValidatorModal(this.props.validator.operator_address)
+    }
+
     if (!this.props.address) return;
 
     if (this.props.address !== prevProps.address) {
@@ -71,15 +75,11 @@ class Delegations extends React.Component {
       }
     }
 
-    if (!this.props.delegations) return
-
-    const delegationsChanged = _.difference(Object.keys(this.props.delegations), Object.keys(prevProps.delegations || {})).length > 0
-    if (delegationsChanged) {
-      this.getGrants()
-    }
-
-    if (prevProps.validator !== this.props.validator && this.props.validator && !this.state.validatorModal.show) {
-      this.showValidatorModal(this.props.validator.operator_address)
+    if (this.props.delegations && prevProps.delegations){
+      const delegationsChanged = _.difference(Object.keys(this.props.delegations), Object.keys(prevProps.delegations || {})).length > 0
+      if (delegationsChanged) {
+        this.getGrants()
+      }
     }
   }
 
@@ -293,10 +293,15 @@ class Delegations extends React.Component {
   }
 
   orderedOperators() {
-    return _.sortBy(this.props.operators, ({ address }) => {
+    const grants = this.operatorGrants()
+    return _.sortBy(this.props.operators, ({ address, botAddress }) => {
       if (!this.props.delegations) return 0
 
-      return this.props.delegations[address] ? 0 : 1
+      if(this.props.delegations[address]){
+        return grants[botAddress]?.grantsExist ? -1 : 0
+      }else{
+        return 1
+      }
     });
   }
 
@@ -426,13 +431,8 @@ class Delegations extends React.Component {
       const denomRewards = rewards && this.denomRewards(rewards);
       const operator = this.operatorForValidator(validatorAddress);
       const grants = operator && this.operatorGrants()[operator.botAddress]
-      let rowVariant =
-        operator && delegation
-          ? grants.grantsValid
-            ? "table-success"
-            : grants.grantsExist ? "table-danger" : "table-warning"
-          : undefined;
 
+      let rowVariant 
       if (isValidatorOperator) rowVariant = 'table-info'
 
       const delegationBalance = (delegation && delegation.balance) || {
@@ -465,7 +465,7 @@ class Delegations extends React.Component {
               network={this.props.network}
               validator={validator}
               operator={operator}
-              grants={operator && this.operatorGrants()[operator.botAddress]}
+              grants={grants}
               delegation={delegation}
               authzSupport={this.authzSupport()}
               restakePossible={this.restakePossible()}
@@ -543,9 +543,9 @@ class Delegations extends React.Component {
                         this.restakePossible() && (
                           <>
                             <Dropdown.Item onClick={() => this.showValidatorModal(validatorAddress, { activeTab: 'restake' })}>
-                              {this.operatorGrants()[operator.botAddress].grantsValid ? 'Manage REStake' : 'Enable REStake'}
+                              {grants.grantsValid ? 'Manage REStake' : 'Enable REStake'}
                             </Dropdown.Item>
-                            {this.operatorGrants()[operator.botAddress].grantsExist && (
+                            {grants.grantsExist && (
                               <RevokeRestake
                                 address={this.props.address}
                                 operator={operator}
@@ -662,18 +662,14 @@ class Delegations extends React.Component {
     const alerts = (
       <>
         {!this.authzSupport() && (
-          <AlertMessage variant="warning" dismissible={false}>
-            {this.props.network.prettyName} doesn't support Authz just yet. You
-            can manually restake for now and REStake is ready when support is
-            enabled
+          <AlertMessage variant="info" dismissible={false}>
+            {this.props.network.prettyName} doesn't support Authz just yet. You can stake and compound manaully for now and REStake will update automatically when support is added.
           </AlertMessage>
         )}
-        {this.authzSupport() && !this.props.operators.length && (
-          <AlertMessage
-            variant="warning"
-            message="There are no REStake operators for this network yet. You can compound manually, or check the About section to run one yourself"
-            dismissible={false}
-          />
+        {this.props.network.experimental && (
+          <AlertMessage variant="info" dismissible={false}>
+            This network was added to REStake automatically and has not been thoroughly tested yet. <a href="https://github.com/eco-stake/restake/issues" target="_blank">Raise an issue</a> if you have any problems.
+          </AlertMessage>
         )}
         {this.authzSupport() &&
           this.props.operators.length > 0 &&
@@ -684,7 +680,7 @@ class Delegations extends React.Component {
                 dismissible={false}
               >
                 <p>Ledger devices are not supported in the REStake UI currently. Support will be added as soon as it is possible.</p>
-                <p className="mb-0"><span onClick={() => this.setState({ showAboutLedger: true })} role="button" className="text-dark text-decoration-underline">A manual workaround is possible using the CLI</span></p>
+                <p className="mb-0"><span onClick={() => this.setState({ showAboutLedger: true })} role="button" className="text-reset text-decoration-underline">A manual workaround is possible using the CLI</span></p>
               </AlertMessage>
             </>
           )}

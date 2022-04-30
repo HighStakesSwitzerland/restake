@@ -2,6 +2,7 @@ import React, { useState, useReducer, useEffect } from 'react';
 
 import CosmosDirectory from '../utils/CosmosDirectory.mjs';
 import Network from '../utils/Network.mjs'
+import TooltipIcon from './TooltipIcon.js';
 
 import {
   Button,
@@ -9,6 +10,8 @@ import {
   Form,
   Badge
 } from 'react-bootstrap'
+
+import { CheckCircle, XCircle } from "react-bootstrap-icons";
 
 import Select from 'react-select';
 
@@ -20,8 +23,8 @@ function NetworkSelect(props) {
   const [validators, setValidators] = useState([]);
   const [operatorCounts, setOperatorCounts] = useState({});
   const [options, setOptions] = useReducer(
-    (state, newState) => ({...state, ...newState}),
-    {networks: [], operators: [], network: {value: ''}}
+    (state, newState) => ({ ...state, ...newState }),
+    { networks: [], operators: [], network: { value: '' } }
   )
 
   function handleOpen() {
@@ -53,10 +56,10 @@ function NetworkSelect(props) {
       const network = new Network(data);
       network.load().then(() => {
         setSelectedNetwork(network);
-        if (network.usingDirectory && !directoryConnected(data)) {
+        if (network.usingDirectory && !network.connectedDirectory()) {
           throw false;
         }
-        network.connect().then(() => {
+        return network.connect().then(() => {
           if (network.connected) {
             setValidators(network.getValidators());
             setLoading(false);
@@ -66,21 +69,40 @@ function NetworkSelect(props) {
         });
       }).catch(error => {
         console.log(error);
-        setError('Unable to connect to this network currently. Try again later.');
+        setError('Could not connect to this network. Try again later');
         setLoading(false);
       });
     }
   }
 
-  function directoryConnected(data) {
-    // replace with available status when added to directory
-    return ['rpc', 'rest'].every(type => data['best_apis'][type].length > 0)
-  }
+  function renderCheck({ title, failTitle, description, failDescription, state, successClass, failClass, identifier }){
+    const className = state ? (successClass || 'success') : (failClass || 'warning')
+
+    const content = (
+      <div>
+        {state ? (
+          <CheckCircle className="me-2 mb-1" />
+        ) : (
+          <XCircle className="me-2 mb-1" />
+        )}{state ? title : (failTitle || title)}
+      </div>
+    )
+    
+    return (
+      <li key={identifier} className={`list-group-item list-group-item-${className}`}>
+        <TooltipIcon
+          icon={content}
+          identifier={identifier}
+          tooltip={state ? description : (failDescription || description)}
+        />
+      </li>
+    )
+  b}
 
   useEffect(() => {
-    if(props.show && !show){
+    if (props.show && !show) {
       handleOpen()
-    }else if(!props.show && show){
+    } else if (!props.show && show) {
       handleClose()
     }
   }, [props.show])
@@ -91,28 +113,22 @@ function NetworkSelect(props) {
       networks: networks.map(el => {
         const network = new Network(el)
         return {
-          value: el.name, 
-          label: el.pretty_name, 
+          value: el.name,
+          label: el.pretty_name,
           image: el.image,
-          operatorCount: el.operators?.length || operatorCounts[el.name], 
-          authz: el.authzSupport,
-          online: !network.usingDirectory || directoryConnected(el)
+          operatorCount: el.operators?.length || operatorCounts[el.name],
+          authz: el.params?.authz,
+          online: !network.usingDirectory || network.connectedDirectory(),
+          experimental: network.experimental
         }
       }),
-      network: selectedNetwork && {
-        value: selectedNetwork.name,
-        label: selectedNetwork.prettyName,
-        image: selectedNetwork.image,
-        operatorCount: selectedNetwork.operators?.length,
-        authz: selectedNetwork.authzSupport,
-        online: true // modal will show status
-      }
+      network: selectedNetwork && selectedNetwork.name
     })
   }, [props.networks, selectedNetwork, operatorCounts])
 
   return (
     <>
-      <Button onClick={handleOpen} variant="link" className="d-flex align-items-center text-dark text-decoration-none border-secondary btn-outline-light" role="button">
+      <Button onClick={handleOpen} variant="link" className="d-flex align-items-center text-reset text-decoration-none border-secondary btn-outline-light" role="button">
         <div className="avatar avatar-sm rounded-circle text-white">
           <img alt={props.network.prettyName} src={props.network.image} height={30} width={30} />
         </div>
@@ -135,56 +151,92 @@ function NetworkSelect(props) {
         </Modal.Header>
         <Modal.Body>
           {selectedNetwork &&
-          <Form onSubmit={handleSubmit}>
-            {props.networks &&
-            <div className="row mb-3">
-              <div className="col">
-                <Select
-                  value={options.network}
-                  isClearable={false}
-                  name="network"
-                  options={options.networks}
-                  onChange={selectNetwork}
-                  formatOptionLabel={network => (
-                    <div className={ 'row' + (!network.online ? ' text-muted' : '') }>
-                      <div className="col-1">
-                        <img src={network.image} width={30} height={30} alt={network.label} />
-                      </div>
-                      <div className="col pt-1">
-                        <span className="ms-1">{network.label} {!network.online && <small>(Offline)</small>}</span>
-                      </div>
-                      <div className="col text-end pt-1">
-                        {network.operatorCount > 0 &&
-                        <small>{network.operatorCount} Operator{network.operatorCount > 1 ? 's' : ''}</small>
-                        }
-                        {network.authz
-                          ? <Badge className="ms-3 rounded-pill" bg="success">Authz</Badge>
-                          : <Badge className="ms-3 rounded-pill text-decoration-line-through" bg="danger">Authz</Badge>
-                        }
-                      </div>
-                    </div>
-                  )}/>
+            <Form onSubmit={handleSubmit}>
+              {props.networks &&
+                <div className="row mb-3">
+                  <div className="col">
+                    <Select
+                      value={options.networks.find(el => el.value === options.network)}
+                      isClearable={false}
+                      name="network"
+                      options={options.networks}
+                      onChange={selectNetwork}
+                      formatOptionLabel={network => (
+                        <div className={'row' + (!network.online ? ' text-muted' : '')}>
+                          <div className="col-1">
+                            <img src={network.image} width={30} height={30} alt={network.label} />
+                          </div>
+                          <div className="col pt-1">
+                            <span className="ms-1">{network.label} {!network.online && <small>(Offline)</small>}</span>
+                          </div>
+                          <div className="col text-end pt-1">
+                            {network.operatorCount > 0 &&
+                              <small>{network.operatorCount} Operator{network.operatorCount > 1 ? 's' : ''}</small>
+                            }
+                            {network.authz
+                              ? <Badge className={`ms-3 rounded-pill` + (!network.online ? ' opacity-50' : '')} bg="success">Authz</Badge>
+                              : <Badge className={`ms-3 rounded-pill text-decoration-line-through` + (!network.online ? ' opacity-50' : '')} bg="danger">Authz</Badge>
+                            }
+                          </div>
+                        </div>
+                      )}
+                      theme={(theme) => ({
+                        ...theme,
+                        colors: {
+                          ...theme.colors,
+                          neutral0: 'var(--bs-body-bg)',
+                          neutral80: 'var(--bs-body)',
+                          primary25: 'var(--bs-light)'
+                        },
+                      })}
+                    />
+                  </div>
+                </div>
+              }
+              <ul className="list-group">
+                {([
+                  renderCheck({
+                    title: 'API connected',
+                    failTitle: 'API offline',
+                    failDescription: error,
+                    state: selectedNetwork.connected && !error,
+                    failClass: 'danger',
+                    identifier: 'network'
+                  }),
+                  renderCheck({
+                    title: 'Authz support',
+                    failTitle: 'No Authz support',
+                    failDescription: "This network doesn't support Authz just yet. You can stake and compound manaully for now and REStake will update automatically when support is added.",
+                    state: selectedNetwork.authzSupport,
+                    identifier: 'authz'
+                  }),
+                  renderCheck({
+                    title: <span><strong>{selectedNetwork.operators?.length}</strong> REStake operators</span>,
+                    failTitle: "No REStake operators",
+                    failDescription: "There are no operators for this network yet. You can stake and compound manually in the meantime.",
+                    state: selectedNetwork.operators?.length > 0,
+                    identifier: 'operators'
+                  }),
+                  renderCheck({
+                    title: 'Tested with REStake',
+                    failTitle: 'Not tested with REStake',
+                    failDescription: "This network was added to REStake automatically and has not been thoroughly tested yet.",
+                    state: selectedNetwork.operators?.length > 0,
+                    identifier: 'experimental'
+                  })
+                ])}
+              </ul>
+              <div className="text-center mt-4 mb-2">
+                {!loading
+                  ? !error && <Button type="submit" className="btn btn-primary btn-lg">Change network</Button>
+                  : (
+                    <Button className="btn-primary btn-lg mr-5" disabled>
+                      <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>&nbsp;
+                      Updating...
+                    </Button>
+                  )}
               </div>
-            </div>
-            }
-            {error &&
-              <p><em>{error}</em></p>
-            }
-            {!error && !selectedNetwork.authzSupport &&
-              <p><em>This network does not support Authz yet. You can manually stake and compound for now</em></p>
-            }
-            {!error && selectedNetwork.authzSupport && selectedNetwork.operators?.length < 1 &&
-              <p><em>This network supports Authz but there are no operators just yet. You can manually REStake for now</em></p>
-            }
-            {!loading
-              ? !error && <Button type="submit" className="btn btn-primary">Change</Button>
-              : (
-                <Button className="btn-sm btn-primary mr-5" disabled>
-                  <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>&nbsp;
-                  Updating...
-                </Button>
-              )}
-          </Form>
+            </Form>
           }
         </Modal.Body>
       </Modal>
