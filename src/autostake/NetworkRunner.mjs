@@ -307,7 +307,7 @@ export default class NetworkRunner {
   }
 
   async throttleQuery(){
-    if(!this.opts.queryThrottle) return 
+    if(!this.opts.queryThrottle) return
 
     await new Promise(r => setTimeout(r, this.opts.queryThrottle));
   }

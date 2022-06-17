@@ -232,6 +232,7 @@ function SigningClient(network, signer) {
       }).then(el => el.data.gas_info.gas_used)
       return (parseInt(estimate * (modifier || defaultGasModifier)));
     } catch (error) {
+      console.log(error)
       throw new Error(error.response?.data?.message || error.message)
     }
   }

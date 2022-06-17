@@ -436,7 +436,7 @@ class Delegations extends React.Component {
       <>
         {alerts}
         <div className="mb-2">
-          <Validators 
+          <Validators
             theme={this.props.theme}
             network={this.props.network}
             address={this.props.address}

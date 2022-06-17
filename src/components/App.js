@@ -40,12 +40,12 @@ import GitHubButton from 'react-github-btn'
 import Logo from '../assets/logo.png'
 import Logo2x from '../assets/logo@2x.png'
 import Logo3x from '../assets/logo@3x.png'
-import LogoWhite from '../assets/logo-white.png'
-import LogoWhite2x from '../assets/logo-white@2x.png'
-import LogoWhite3x from '../assets/logo-white@3x.png'
+import LogoWhite from '../assets/logo.png'
+import LogoWhite2x from '../assets/logo@2x.png'
+import LogoWhite3x from '../assets/logo@3x.png'
 
-import PoweredByAkash from '../assets/powered-by-akash.svg'
-import PoweredByAkashWhite from '../assets/powered-by-akash-white.svg'
+import PoweredByAkash from '../assets/logo@3x.png'
+import PoweredByAkashWhite from '../assets/logo@3x.png'
 import TooltipIcon from './TooltipIcon';
 import Governance from './Governance';
 import Networks from './Networks';
@@ -291,7 +291,7 @@ class App extends React.Component {
 
   addressName() {
     if(!this.state.address) return null
-    
+
     if(this.viewingWallet()) return this.state.wallet.name
     return this.currentFavouriteAddress()?.label || this.state.address
   }
@@ -318,23 +318,23 @@ class App extends React.Component {
       granterGrants = await this.props.queryClient.getGranterGrants(address)
       if (address !== this.state.address) return
       this.setState((state) => {
-        return { 
-          grantQuerySupport: true, 
-          grants: { 
+        return {
+          grantQuerySupport: true,
+          grants: {
             ...state.grants,
             granter: granterGrants,
-          } 
+          }
         }
       })
       granteeGrants = await this.props.queryClient.getGranteeGrants(address)
       if (address !== this.state.address) return
       this.setState((state) => {
         if (address !== state.address) return {}
-        return { 
-          grants: { 
+        return {
+          grants: {
             ...state.grants,
             grantee: granteeGrants
-          } 
+          }
         }
       })
       return
@@ -783,11 +783,11 @@ class App extends React.Component {
           )}
           <hr />
           <p className="mt-5 text-center">
-            Enabling REStake will authorize the validator to send <em>Delegate</em> transactions on your behalf for 1 year <a href="https://docs.cosmos.network/master/modules/authz/" target="_blank" rel="noreferrer" className="text-reset">using Authz</a>.<br />
-            They will only be authorized to delegate to their own validator. You can revoke the authorization at any time and everything is open source.
+            Enabling REStake will authorize us to send <em>WithdrawDelegatorReward</em> and <em>Delegate</em> transactions on your behalf for 1 year using <a href="https://docs.cosmos.network/master/modules/authz/" target="_blank" rel="noreferrer">Authz</a>.<br />
+            We will only be authorized to delegate to our own validator. You can revoke the authorization at any time and everything is open source.
           </p>
           <p className="text-center mb-4">
-            <strong>The validators will pay the transaction fees for you.</strong>
+            <strong>We will pay the transaction fees for you.</strong>
           </p>
           <p className="text-center mb-5">
             <Button onClick={() => this.setState({ showAbout: true })} variant="outline-secondary">More info</Button>

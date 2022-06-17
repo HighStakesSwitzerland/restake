@@ -31,7 +31,7 @@ const QueryClient = async (chainId, restUrls, opts) => {
           "/cosmos/staking/v1beta1/validators?" +
           searchParams.toString(),
         {
-          timeout: opts.timeout || 10000,
+          timeout: opts.timeout || 30000,
         }
       )
       .then((res) => res.data);
@@ -118,7 +118,7 @@ const QueryClient = async (chainId, restUrls, opts) => {
     const { pageSize } = opts || {}
     return getAllPages((nextKey) => {
       const searchParams = new URLSearchParams();
-      searchParams.append("pagination.limit", pageSize || 100);
+      searchParams.append("pagination.limit", pageSize || 10);
       if (nextKey) searchParams.append("pagination.key", nextKey);
 
       return axios
@@ -146,7 +146,7 @@ const QueryClient = async (chainId, restUrls, opts) => {
     const { pageSize } = opts || {}
     return getAllPages((nextKey) => {
       const searchParams = new URLSearchParams();
-      searchParams.append("pagination.limit", pageSize || 100);
+      searchParams.append("pagination.limit", pageSize || 10);
       if (nextKey) searchParams.append("pagination.key", nextKey);
 
       return axios
@@ -162,7 +162,7 @@ const QueryClient = async (chainId, restUrls, opts) => {
     const { pageSize } = opts || {}
     return getAllPages((nextKey) => {
       const searchParams = new URLSearchParams();
-      searchParams.append("pagination.limit", pageSize || 100);
+      searchParams.append("pagination.limit", pageSize || 10);
       if (nextKey) searchParams.append("pagination.key", nextKey);
 
       return axios

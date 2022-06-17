@@ -38,7 +38,7 @@
   "scripts": {
     "start": "npx parcel src/index.html",
     "prebuild": "rm -rf dist/",
-    "build": "npx parcel build src/index.html",
+    "build": "npx parcel build src/index.html --public-url /restake/",
     "dryrun": "NODE_OPTIONS=--openssl-legacy-provider node scripts/dryrun.mjs",
     "autostake": "NODE_OPTIONS=--openssl-legacy-provider node scripts/autostake.mjs"
   },

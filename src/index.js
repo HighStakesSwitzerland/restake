@@ -16,7 +16,7 @@ import './index.css';
 
 const app = (
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename="/restake">
       <Routes>
         <Route path="/" element={<NetworkFinder />} />
         <Route path="/:network" element={<NetworkFinder />} />
