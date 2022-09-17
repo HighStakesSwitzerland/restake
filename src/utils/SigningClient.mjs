@@ -82,7 +82,7 @@ function SigningClient(network, signer) {
           value = nestedAccount
         }
 
-        return value 
+        return value
       })
       .catch((error) => {
         if(error.response?.status === 404){
@@ -135,13 +135,13 @@ function SigningClient(network, signer) {
   }
 
   async function broadcast(txBody){
-    const timeoutMs = network.txTimeout || 60_000
+    const timeoutMs = network.txTimeout || 5_000
     const pollIntervalMs = 3_000
     let timedOut = false
     const txPollTimeout = setTimeout(() => {
       timedOut = true;
     }, timeoutMs);
-    
+
     const pollForTx = async (txId) => {
       if (timedOut) {
         throw new Error(
