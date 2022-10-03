@@ -12,11 +12,11 @@ export default class NetworkRunner {
     this.signingClient = signingClient
     this.queryClient = network.queryClient
     this.opts = _.merge({
-      batchPageSize: 100,
-      batchQueries: 25,
+      batchPageSize: 10,
+      batchQueries: 15,
       batchTxs: 50,
       delegationsTimeout: 20000,
-      queryTimeout: network.data.autostake?.delegatorTimeout || 5000, // deprecate delegatorTimeout
+      queryTimeout: 30000,
       queryThrottle: 100,
       gasModifier: 1.1,
     }, network.data.autostake, opts)
