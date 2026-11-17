@@ -15,7 +15,8 @@ class Health {
     this.apiKey = apiKey
     this.dryRun = dryRun
     this.logs = []
-    this.getOrCreateHealthCheck()
+    this.logger = createLogger('health')
+    this.readyPromise = this.getOrCreateHealthCheck()
 
     if (address) {
       // This is necessary as the default provider - hc-ping.com - has a built in ping mechanism
@@ -23,11 +24,10 @@ class Health {
       // https://healthchecks.selfhosted.com/ping/{uuid} rather than https://hc-ping.com/{uuid}
       this.address = this.address + "/ping"
     }
-
-    this.logger = createLogger('health')
   }
 
-  started(...args) {
+  async started(...args) {
+    await this.readyPromise
     this.logger.info(args.join(' '))
     if (this.uuid) this.logger.info('Starting health', { path: [this.address, this.uuid].join('/') })
     return this.ping('start', [args.join(' ')])
@@ -70,7 +70,7 @@ class Health {
         this.uuid = res.data.ping_url.split('/')[4]
       });
     } catch (error) {
-      this.logger.error('Health Check creation failed', { error })
+      this.logger.error('Health Check creation failed', { error: { message: error.message, status: error.response?.status } })
     }
   }
 
@@ -80,6 +80,7 @@ class Health {
   }
 
   async ping(action, logs) {
+    await this.readyPromise
     if (!this.uuid) return
     if (this.dryRun) return this.logger.info('DRYRUN: Skipping health check ping')
 
@@ -88,7 +89,7 @@ class Health {
       url: _.compact([this.address, this.uuid, action]).join('/'),
       data: logs.join("\n")
     }).catch(error => {
-      this.logger.error('Health ping failed', { error })
+      this.logger.error('Health ping failed', { error: { message: error.message, status: error.response?.status } })
     })
   }
 }

@@ -142,7 +142,7 @@ function SigningClient(network, signer) {
       },
       (error) => {
         clearTimeout(txPollTimeout);
-        return error
+        throw error
       },
     )
   }

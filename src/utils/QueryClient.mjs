@@ -3,6 +3,7 @@ import axiosRetry from 'axios-retry';
 import _ from "lodash";
 
 import { get } from './Helpers.mjs';
+import { RESTAKE_USER_AGENT } from './constants.mjs';
 
 const QueryClient = async (chainId, restUrls, opts) => {
   const config = _.merge({
@@ -177,7 +178,7 @@ const QueryClient = async (chainId, restUrls, opts) => {
   }
 
   function getWithdrawAddress(address, opts) {
-    return get(apiUrl('distribution', `delegators/${address}/withdraw_address`))
+    return get(apiUrl('distribution', `delegators/${address}/withdraw_address`), opts)
       .then((res) => res.data)
       .then((result) => {
         return result.withdraw_address;

@@ -19,7 +19,6 @@ export default function Autostake(mnemonic, opts) {
   const mainLogger = createLogger('autostake')
 
   opts = opts || {}
-  let failed = false
 
   if (!mnemonic) {
     mainLogger.error('Please provide a MNEMONIC environment variable')
@@ -43,8 +42,8 @@ export default function Autostake(mnemonic, opts) {
         health.started('⚛')
         const results = await runWithRetry(data, health)
         const network = results[0]?.networkRunner?.network
-        const { success, skipped } = results[results.length - 1] || {}
-        if(!skipped && !failed){
+        const { success, skipped, forceFail } = results[results.length - 1] || {}
+        if(!skipped && !forceFail){
           health.log(`Autostake ${success ? 'completed' : 'failed'} after ${results.length} attempt(s)`)
           results.forEach(({networkRunner, error}, index) => {
             health.log(`Attempt ${index + 1}:`)
@@ -67,6 +66,7 @@ export default function Autostake(mnemonic, opts) {
     const maxRetries = data.autostake?.retries ?? 2
     let { failedAddresses } = runners[runners.length - 1] || {}
     let networkRunner, error
+    let forceFail = false
     try {
       networkRunner = await getNetworkRunner(data)
       if (!networkRunner){
@@ -75,15 +75,17 @@ export default function Autostake(mnemonic, opts) {
       }
 
       await networkRunner.run(failedAddresses?.length && failedAddresses)
+      forceFail = Boolean(networkRunner?.forceFail)
       if (!networkRunner.didSucceed()) {
         error = networkRunner.error?.message
         failedAddresses = networkRunner.failedAddresses()
       }
     } catch (e) {
       error = e.message
+      forceFail = Boolean(e?.forceFail)
     }
-    runners.push({ success: networkRunner?.didSucceed(), networkRunner, error, failedAddresses })
-    if (!networkRunner?.didSucceed() && !networkRunner?.forceFail && retries < maxRetries && !failed) {
+    runners.push({ success: networkRunner?.didSucceed(), networkRunner, error, failedAddresses, forceFail })
+    if (!networkRunner?.didSucceed() && !forceFail && retries < maxRetries) {
       await logResults(health, networkRunner, error, `Failed attempt ${retries + 1}/${maxRetries + 1}, retrying in 30 seconds...`)
       await new Promise(r => setTimeout(r, 30 * 1000));
       return await runWithRetry(data, health, retries + 1, runners)
@@ -119,9 +121,10 @@ export default function Autostake(mnemonic, opts) {
     try {
       await network.load()
     } catch(e) {
-      if(e.response.status === 404){
-        failed = true
-        throw new Error(`${network.name} not found in Chain Registry`)
+      if(e.response?.status === 404){
+        const error = new Error(`${network.name} not found in Chain Registry`)
+        error.forceFail = true
+        throw error
       }
       throw new Error(`Unable to load network data for ${network.name}`)
     }
@@ -213,6 +216,7 @@ export default function Autostake(mnemonic, opts) {
   function getNetworksData(networksOverridePath) {
     const networksData = fs.readFileSync('src/networks.json');
     const networks = JSON.parse(networksData);
+    if (!networksOverridePath || !fs.existsSync(networksOverridePath)) return networks
     try {
       const overridesData = fs.readFileSync(networksOverridePath);
       const overrides = overridesData && JSON.parse(overridesData) || {}

@@ -114,7 +114,6 @@ class Network {
       this.restUrl = this.queryClient.restUrl
       this.connected = this.queryClient.connected && (!this.usingDirectory || this.connectedDirectory())
     } catch (error) {
-      console.log(error)
       this.connected = false
     }
   }
