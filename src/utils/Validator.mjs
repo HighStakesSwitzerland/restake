@@ -13,10 +13,11 @@ const Validator = (network, data) => {
   const commissionRate = data.commission.commission_rates.rate
 
   function isValidatorOperator(address) {
-    if (!address || !window.atob) return false;
+    if (!address || typeof atob !== 'function') return false;
 
     const prefix = network.prefix
-    const validatorOperator = Bech32.encode(prefix, Bech32.decode(data.operator_address).data)
+    const decoded = Bech32.decode(data.operator_address)
+    const validatorOperator = Bech32.encode(prefix, decoded.words || decoded.data)
     return validatorOperator === address
   }
 

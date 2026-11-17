@@ -251,7 +251,7 @@ export default class NetworkRunner {
       if (smallerEq(grant.maxTokens, 0)) {
         this.logger.info('Grant balance is empty, skipping', {
           address,
-          maxTokens: grant.maxToken,
+          maxTokens: grant.maxTokens,
           denom: this.network.denom,
         })
         return
@@ -260,7 +260,7 @@ export default class NetworkRunner {
         autostakeAmount = grant.maxTokens
         this.logger.info('Grant balance is too low, using remaining', {
           address,
-          maxTokens: grant.maxToken,
+          maxTokens: grant.maxTokens,
           denom: this.network.denom,
         })
       }
@@ -276,47 +276,45 @@ export default class NetworkRunner {
   }
 
   async autostake(grantedAddresses) {
-    let batchSize = this.opts.batchTxs
-    this.logger.info('Calculating and autostaking in batches', { batchSize })
+    this.logger.info('Calculating and autostaking in batches', { batchSize: this.opts.batchTxs })
+    await this.sendInBatches(grantedAddresses)
+  }
 
-    const calls = grantedAddresses.map((item, index) => {
+  async sendInBatches(grantedAddresses) {
+    const batchSize = this.opts.batchTxs
+    const addressCalls = grantedAddresses.map((item) => {
       return async () => {
-        let messages
         try {
-          messages = await this.getAutostakeMessage(item)
+          return await this.getAutostakeMessage(item)
         } catch (error) {
           this.setError(item.address, `ERROR Failed to get autostake message ${error.message}`)
         }
-        this.processed[item.address] = true
-
-        await this.sendInBatches(item.address, messages, batchSize, grantedAddresses.length)
       }
     })
-    await executeSync(calls, this.opts.batchQueries)
+    const results = await mapSync(addressCalls, this.opts.batchQueries, (batch, index) => {
+      return this.throttleQuery()
+    })
 
-    this.results = await Promise.all(this.messages)
+    const messages = _.compact(results.flat())
+    if (!messages.length) return
+
+    const batches = _.chunk(messages, batchSize)
+    const txCalls = batches.map((batch, index) => async () => {
+      await this.sendBatch(batch, index + 1)
+    })
+    return await executeSync(txCalls, 1)
   }
 
-  async sendInBatches(address, messages, batchSize, total) {
-    if (messages) {
-      this.batch[address] = messages
-    }
-
-    const addresses = Object.keys(this.batch)
-    const finished = (Object.keys(this.processed).length >= total && addresses.length > 0)
-    if (addresses.length >= batchSize || finished) {
-      const batch = Object.values(this.batch).flat()
-      this.batch = {}
-
-      const messages = [...this.messages]
-      const promise = messages[messages.length - 1] || Promise.resolve()
-      const sendTx = promise.then(() => {
-        this.logger.info('Sending batch', { batch: messages.length + 1 })
-        return this.sendMessages(addresses, batch)
-      })
-      this.messages.push(sendTx)
-      return sendTx
-    }
+  async sendBatch(batch, batchNumber) {
+    this.logger.info('Sending batch', { batch: batchNumber })
+    const addresses = _.uniq(batch.map(el => {
+      if (el.address) return el.address
+      if (el.value instanceof Uint8Array) return MsgDelegate.decode(el.value).delegatorAddress
+      return undefined
+    }).filter(Boolean))
+    const result = await this.sendMessages(addresses, batch)
+    this.results.push(result)
+    return result
   }
 
   async sendMessages(addresses, messages) {
